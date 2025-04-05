@@ -3,57 +3,46 @@ import nltk
 import re
 from nltk.tokenize import word_tokenize
 from nltk.corpus import stopwords
-from nltk.stem import PorterStemmer, WordNetLemmatizer
-from textblob import TextBlob
+from nltk.stem import WordNetLemmatizer
+from datasets import load_dataset
 
 # Download necessary NLTK data
 nltk.download("punkt")
-nltk.download('punkt_tab')
 nltk.download("stopwords")
 nltk.download("wordnet")
 
-# Load dataset
-df = pd.read_csv(r"C:\Users\User\Desktop\rewritten_texts_csv.csv", encoding="utf-8", encoding_errors="replace")
+# Load dataset and convert to DataFrame
+dataset = load_dataset("bogdancazan/wikilarge-text-simplification")
+df = pd.DataFrame(dataset["train"])  # Convert only the 'train' split
 
-# Handling missing data and whitespaces
-df = df.fillna("")  # Replace NaN values with empty strings
-df = df.applymap(lambda x: x.strip() if isinstance(x, str) else x)  # Strip whitespace
+# Handling missing data and whitespace
+df = df.fillna("").applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
 # Initialize NLP tools
 stop_words = set(stopwords.words("english"))
-stemmer = PorterStemmer()
 lemmatizer = WordNetLemmatizer()
 
 def preprocess_text(text):
-    # Convert to lowercase
-    text = text.lower()
+    if not isinstance(text, str):  # Ensure text is a string
+        return ""
     
-    # Remove special characters (punctuation, symbols)
-    text = re.sub(r"[^a-zA-Z0-9\s-]", "", text)  # Only allow alphanumeric characters and hyphen
+    text = text.lower()  # Convert to lowercase
+    text = re.sub(r"[^a-zA-Z0-9\s-]", "", text)  # Remove special characters except hyphen
+    words = word_tokenize(text)  # Tokenize
+    words = [word for word in words if word not in stop_words]  # Remove stopwords
+    words = [subword for word in words for subword in word.split("-")]  # Split hyphenated words
+    words = [lemmatizer.lemmatize(word) for word in words]  # Lemmatization
     
-    # Tokenize text
-    words = word_tokenize(text)
+    return " ".join(words)
 
-    # Remove stopwords
-    words = [word for word in words if word not in stop_words]
+# Check actual column names before applying preprocessing
+print("Dataset columns:", df.columns)
 
-    # Optionally handle compound words more carefully (split hyphenated words if needed)
-    words = [subword for word in words for subword in word.split("-")]
+# Apply preprocessing to the correct column (assuming "Normal" is the target column)
+df["cleaned_text"] = df["Normal"].apply(preprocess_text)
 
-    # Apply Lemmatization (to keep words in full form like 'rewrite' instead of 'rewrit')
-    words_processed = [lemmatizer.lemmatize(word) for word in words]  # Using lemmatization here
+# Save cleaned dataset
+df.to_csv(r"C:\Users\sushm\Downloads\cleaned_dataset.csv", index=False)
 
-    # Reconstruct the text
-    return " ".join(words_processed)
+print("✅ Text preprocessing completed. Cleaned dataset saved as 'cleaned_dataset.csv'.")
 
-# Apply text preprocessing to all text columns
-for column in ['original_text', 'rewritten_text', 'prompt', 'final_prompt']:
-    df[f"{column}_cleaned"] = df[column].apply(preprocess_text)
-
-# Deduplication (optional, if you want to keep only unique rows based on cleaned text)
-df = df.drop_duplicates()
-
-# Save the cleaned dataset
-df.to_csv("cleaned_dataset.csv", index=False)
-
-print("Text preprocessing completed. Cleaned dataset saved as 'cleaned_dataset.csv'.")
