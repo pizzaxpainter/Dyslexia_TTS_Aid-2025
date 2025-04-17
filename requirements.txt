@@ -6,3 +6,5 @@ pandas
 pdfplumber
 pyttsx3
 streamlit
+sentencepiece
+scikit-learn
