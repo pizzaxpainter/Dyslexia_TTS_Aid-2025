@@ -2,9 +2,9 @@
 
 import streamlit as st
 from transformers import T5ForConditionalGeneration, T5Tokenizer, T5Config
-
-
+import pyttsx3
 import torch
+import time
 
 class TransformerSimplifier(T5ForConditionalGeneration):
     def __init__(self, config):
@@ -14,7 +14,7 @@ class TransformerSimplifier(T5ForConditionalGeneration):
     def set_tokenizer(self, tokenizer: T5Tokenizer):
         self.tokenizer = tokenizer
 
-    def generate_simplified_text(self, input_text: str, max_length=512):
+    def generate_simplified_text(self, input_text: str, max_length=4096):
         if self.tokenizer is None:
             raise ValueError("Tokenizer is not set.")
 
@@ -58,6 +58,30 @@ def load_model_and_tokenizer():
     model.eval()
     return model, tokenizer
 
+# # Text-to-Speech function
+def speak_and_highlight(text):
+    engine = pyttsx3.init()
+    words = text.split()
+    
+    placeholder = st.empty()
+
+    for word in words:
+        # Highlight the current word
+        highlighted_text = ""
+        for w in words:
+            if w == word:
+                highlighted_text += f"**:orange[{w}]** "
+            else:
+                highlighted_text += w + " "
+        placeholder.markdown(highlighted_text)
+
+        # Speak the current word
+        engine.say(word)
+        engine.runAndWait()
+
+        # Small pause
+        time.sleep(0.1)
+
 # Streamlit app
 def main():
     st.title("Dyslexia Text-to-Speech Aid")
@@ -67,16 +91,26 @@ def main():
 
     text_input = st.text_area("Enter text to simplify:", "")
 
+    # Initialize session state for simplified text
+    if "simplified_text" not in st.session_state:
+        st.session_state.simplified_text = ""
+
     if st.button("Simplify"):
         if text_input:
             # Simplify the input text using the model
             simplified_text = model.generate_simplified_text(text_input)
-
-            # Display the simplified text
-            st.write("Simplified Text:")
-            st.write(simplified_text)
+            st.session_state.simplified_text = simplified_text  # Save to session_state
         else:
-            st.write("Please enter some text to simplify.")
+            st.warning("Please enter some text to simplify.")
+
+    # Show simplified text if it exists
+    if st.session_state.simplified_text:
+        st.write("Simplified Text:")
+        st.write(st.session_state.simplified_text)
+
+        if st.button("Read Aloud Simplified Text"):
+            # Call the speak and highlight function
+            speak_and_highlight(st.session_state.simplified_text)
 
 if __name__ == "__main__":
     main()
