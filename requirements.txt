@@ -1,0 +1,10 @@
+torch
+torchvision
+transformers
+nltk
+pandas
+pdfplumber
+pyttsx3
+streamlit
+sentencepiece
+scikit-learn
