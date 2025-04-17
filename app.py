@@ -1,56 +1,82 @@
-# app.py
-import streamlit as st
-import torch
-import pickle
-from models.tokenizer import Tokenizer
-from models.simplifier import TransformerSimplifier, greedy_decode
-from utils.pdf_reader import extract_text
-from utils.expressive_tts import expressive_speak
+# app.py (Streamlit UI)
 
-# Load model and tokenizer
-@st.cache(allow_output_mutation=True)
-def load_model():
-    # Load tokenizer
-    with open("tokenizer.pkl", "rb") as f:
-        tokenizer = pickle.load(f)
-    vocab_size = len(tokenizer.token_to_id)
-    model = TransformerSimplifier(vocab_size, max_len=52)  # max_len must match training (MAX_LEN+2)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.load_state_dict(torch.load("simplifier.pt", map_location=device))
-    model.to(device)
+import streamlit as st
+from transformers import T5ForConditionalGeneration, T5Tokenizer, T5Config
+
+
+import torch
+
+class TransformerSimplifier(T5ForConditionalGeneration):
+    def __init__(self, config):
+        super(TransformerSimplifier, self).__init__(config)
+        self.tokenizer = None
+
+    def set_tokenizer(self, tokenizer: T5Tokenizer):
+        self.tokenizer = tokenizer
+
+    def generate_simplified_text(self, input_text: str, max_length=512):
+        if self.tokenizer is None:
+            raise ValueError("Tokenizer is not set.")
+
+        # Prefix input with task type for better processing
+        input_text = "simplify: " + input_text.strip()
+
+        # Tokenize the input with appropriate max length, truncating any overly long inputs
+        inputs = self.tokenizer.encode(
+            input_text,
+            return_tensors="pt",
+            max_length=max_length,
+            truncation=True,
+            padding="max_length"
+        )
+
+        # Generate with parameters aimed for simplification:
+        output_ids = self.generate(
+            inputs,
+            max_length=max_length,
+            num_beams=4,                 # Beam search for better output quality
+            temperature=0.7,             # Creativity in the generated text
+            top_p=0.9,                   # Nucleus sampling (helps with less common words)
+            repetition_penalty=1.2,      # Avoid repetition of phrases or words
+            no_repeat_ngram_size=2,      # Prevent repeating phrases of size 2
+            early_stopping=True          # Stop generation when answer seems complete
+        )
+
+        # Decode the generated ids and return the simplified text
+        simplified_text = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        return simplified_text
+
+# Streamlit UI
+import streamlit as st
+
+# Function to load the model and tokenizer
+def load_model_and_tokenizer():
+    tokenizer = T5Tokenizer.from_pretrained('t5-small')
+    config = T5Config.from_pretrained('t5-small')
+    model = TransformerSimplifier(config=config)
+    model.load_state_dict(torch.load("simplifier.pt", map_location=torch.device('cpu')))
     model.eval()
     return model, tokenizer
 
-model, tokenizer = load_model()
+# Streamlit app
+def main():
+    st.title("Dyslexia Text-to-Speech Aid")
 
-st.title("Dyslexia Book Reader + Expressive TTS")
-uploaded_pdf = st.file_uploader("Upload your PDF", type=["pdf"])
+    model, tokenizer = load_model_and_tokenizer()
+    model.set_tokenizer(tokenizer)  # Set the tokenizer in the model
 
-if uploaded_pdf:
-    # Save the uploaded PDF temporarily
-    with open("data/temp_book.pdf", "wb") as f:
-        f.write(uploaded_pdf.read())
-    raw_text = extract_text("data/temp_book.pdf")
-    st.subheader("Extracted Text (first 500 chars)")
-    st.write(raw_text[:500] + "...")
-    
-    # Split text into sentences (for demonstration)
-    import nltk
-    nltk.download('punkt')
-    sentences = nltk.sent_tokenize(raw_text)
-    
-    # Simplify sentences using the transformer (inference)
-    st.subheader("Simplified Text with Highlighting")
-    simplified_text = []
-    for i, sent in enumerate(sentences):
-        with st.spinner(f"Simplifying sentence {i+1}/{len(sentences)}..."):
-            simple = greedy_decode(model, sent, tokenizer)
-            simplified_text.append(simple)
-            # Highlight each sentence (Streamlit markdown)
-            st.markdown(f"<mark>{simple}</mark>", unsafe_allow_html=True)
-            # Expressive TTS for each sentence (triggered button for demo)
-            if st.button(f"Speak Sentence {i+1}", key=f"tts_{i}"):
-                expressive_speak(simple)
-    
-    st.subheader("Full Simplified Text")
-    st.write("\n".join(simplified_text))
+    text_input = st.text_area("Enter text to simplify:", "")
+
+    if st.button("Simplify"):
+        if text_input:
+            # Simplify the input text using the model
+            simplified_text = model.generate_simplified_text(text_input)
+
+            # Display the simplified text
+            st.write("Simplified Text:")
+            st.write(simplified_text)
+        else:
+            st.write("Please enter some text to simplify.")
+
+if __name__ == "__main__":
+    main()
