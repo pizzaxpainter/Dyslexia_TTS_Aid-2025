@@ -40,7 +40,7 @@ class TransformerSimplifier(T5ForConditionalGeneration):
     def set_tokenizer(self, tokenizer: T5Tokenizer):
         self.tokenizer = tokenizer
 
-    def generate_simplified_text(self, input_text: str, max_length=512):
+    def generate_simplified_text(self, input_text: str, max_length=4096):
         if self.tokenizer is None:
             raise ValueError("Tokenizer is not set.")
 
@@ -239,18 +239,43 @@ def main():
 
     with col1:
         st.subheader("Input Text")
-        text_input = st.text_area("Enter text to simplify", height=200, label_visibility="collapsed")
+        text_input = st.text_area("Enter text to simplify", height=200, label_visibility="collapsed", key="manual_input")
 
+        # Upload document
+        uploaded_file = st.file_uploader(
+            "Upload a document (PDF, DOCX, or TXT)", 
+            type=["pdf", "docx", "txt"]
+        )
+
+    if uploaded_file is not None:
+        file_extension = uploaded_file.name.split(".")[-1].lower()
+        if file_extension == "txt":
+            text_input = uploaded_file.read().decode("utf-8")
+        elif file_extension == "docx":
+            import docx
+            doc = docx.Document(uploaded_file)
+            text_input = "\n".join([para.text for para in doc.paragraphs])
+        elif file_extension == "pdf":
+            import PyPDF2
+            pdf_reader = PyPDF2.PdfReader(uploaded_file)
+            text_input = "\n".join([page.extract_text() or '' for page in pdf_reader.pages])
+
+        # Display uploaded text (optional)
+        st.text_area("Uploaded Text", text_input, height=200, label_visibility="collapsed", key="uploaded_text")
+
+    
+    with col2:
+        st.subheader("Simplified Text")
+        
         if st.button("✨ Simplify Text", use_container_width=True):
             if text_input.strip():
                 with st.spinner("Simplifying..."):
                     simplified = model.generate_simplified_text(text_input)
                     st.session_state.simplified_text = simplified
             else:
-                st.warning("Please enter some text.")
+                st.warning("Please enter some text or upload a file.")
 
-    with col2:
-        st.subheader("Simplified Text")
+   
         if st.session_state.simplified_text:
             st.markdown(f"<div style='font-size:{font_size}px; line-height:1.6;'>{st.session_state.simplified_text}</div>", unsafe_allow_html=True)
 
@@ -259,7 +284,7 @@ def main():
                 tokens = re.findall(r"[\w']+|[.,!?;]", full_text)
                 placeholder = st.empty()
 
-                # Generate gTTS audio
+                # Generat e gTTS audio
                 tts = gTTS(text=full_text, lang='en', slow=False)
                 audio_file = "temp_audio.mp3"
                 tts.save(audio_file)
