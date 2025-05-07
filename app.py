@@ -1,6 +1,6 @@
 import streamlit as st
-from streamlit.runtime.scriptrunner_utils.script_run_context import get_script_run_ctx
-from streamlit.runtime.scriptrunner_utils.script_run_context import add_script_run_ctx
+from streamlit.runtime.scriptrunner import get_script_run_ctx
+from streamlit.runtime.scriptrunner import add_script_run_ctx
 from transformers import T5ForConditionalGeneration, T5Tokenizer, T5Config
 import pyttsx3
 import torch
@@ -296,7 +296,16 @@ def main():
                 
                 
                 # Display audio player with autoplay
-                st.audio(audio_bytes, format="audio/mp3", start_time=0, autoplay=True)
+                # st.audio(audio_bytes, format="audio/mp3", start_time=0, autoplay=True)
+                import base64
+                
+                audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
+                audio_html = f"""
+                    <audio autoplay="true" controls>
+                        <source src="data:audio/mp3;base64,{audio_base64}" type="audio/mp3">
+                    </audio>
+                """
+                st.markdown(audio_html, unsafe_allow_html=True)
 
                 # Start highlighting thread
                 word_queue = queue.Queue()

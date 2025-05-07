@@ -9,5 +9,4 @@ streamlit
 scikit-learn
 sentencepiece
 gTTS
-PyPDF2
-python-docx
+pyPdf2
