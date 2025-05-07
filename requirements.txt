@@ -1,12 +1,21 @@
-torch
-torchvision
-transformers
-nltk
-pandas
-pdfplumber
-pyttsx3
-streamlit
-scikit-learn
-sentencepiece
-gTTS
-pyPdf2
+# Core libraries
+torch==2.1.2
+torchvision==0.16.2
+
+# Transformers & NLP
+transformers==4.35.2
+sentencepiece==0.2.0
+nltk==3.8.1
+
+# PDF handling
+pdfplumber==0.11.0
+PyPDF2==3.0.1  # note: correct casing and updated name
+
+# TTS
+pyttsx3==2.90
+gTTS==2.5.1
+
+# App framework & utils
+streamlit==1.32.2
+pandas==2.2.1
+scikit-learn==1.3.2
