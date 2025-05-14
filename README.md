@@ -13,6 +13,6 @@ https://dyslexia-tts-aid.streamlit.app/
 6. Short learning curve for new users
 7. Free of cost!
 
-### Reach out for further queries!
+
 
 
